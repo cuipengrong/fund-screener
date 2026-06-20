@@ -215,6 +215,19 @@ with st.sidebar:
             f"{stats['数据库大小']}"
         )
 
+    if st.button("🔥 一键预热缓存", use_container_width=True,
+                 help="提前拉取热门基金数据到本地，加速后续查询"):
+        with st.spinner("预热中，约需 15-30 秒..."):
+            import subprocess, sys, os
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            result = subprocess.run(
+                [sys.executable, "preheat.py", "--funds", "10"],
+                cwd=".", capture_output=True, text=True, timeout=120, env=env,
+            )
+            st.caption(result.stdout[-500:] if result.stdout else "预热完成")
+        st.rerun()
+
 if st.session_state.fund_df is None:
     if st.button("📥 加载基金列表", type="primary", use_container_width=True,
                  help=f"从缓存/SQLite获取{fund_type}基金数据"):
