@@ -39,32 +39,37 @@ st.markdown("""
     gap: 20px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.15);
 }
-.header-icon {
-    font-size: 48px;
-    line-height: 1;
-}
+.header-icon { font-size: 48px; line-height: 1; }
 .header-text h1 {
-    color: #ffffff;
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0 0 6px 0;
-    letter-spacing: 2px;
+    color: #ffffff; font-size: 28px; font-weight: 700;
+    margin: 0 0 6px 0; letter-spacing: 2px;
 }
-.header-text p {
-    color: #a0aec0;
-    font-size: 14px;
-    margin: 0;
-}
+.header-text p { color: #a0aec0; font-size: 14px; margin: 0; }
 .header-badge {
     background: rgba(255,255,255,0.12);
     border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 20px;
-    padding: 4px 14px;
-    font-size: 12px;
-    color: #e2e8f0;
-    margin-left: auto;
-    white-space: nowrap;
+    border-radius: 20px; padding: 4px 14px;
+    font-size: 12px; color: #e2e8f0;
+    margin-left: auto; white-space: nowrap;
 }
+
+/* 投入模拟卡片 */
+.sim-card-row {
+    display: flex; gap: 16px; margin: 16px 0; flex-wrap: wrap;
+}
+.sim-card {
+    flex: 1; min-width: 140px;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border-radius: 14px; padding: 18px 20px;
+    text-align: center; color: #f1f5f9;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+.sim-card .label { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+.sim-card .value { font-size: 26px; font-weight: 700; }
+.sim-card .sub { font-size: 13px; margin-top: 4px; }
+.sim-card.profit { background: linear-gradient(135deg, #14532d, #166534); }
+.sim-card.loss { background: linear-gradient(135deg, #7f1d1d, #991b1b); }
+.sim-card.info { background: linear-gradient(135deg, #1e3a5f, #1e40af); }
 </style>
 
 <div class="header-container">
@@ -150,7 +155,7 @@ with st.sidebar:
     ascending = st.toggle("升序排列", value=False)
 
     st.divider()
-    st.subheader("💰 金额模拟")
+    st.subheader("💰 投入模拟设置")
 
     invest_mode = st.radio(
         "投入方式",
@@ -301,7 +306,7 @@ if fund_df.empty:
 
 # 筛选搜索
 # 方式1: 快速输入代码（逗号/空格/换行分隔）
-st.subheader("⚡ 方式一：直接输入代码")
+st.subheader("⚡ 直接输入基金代码")
 quick_codes = st.text_area(
     "输入基金代码，用逗号、空格或换行分隔",
     placeholder="例如: 001480, 011369, 010013, 001956, 110020",
@@ -311,7 +316,7 @@ quick_codes = st.text_area(
 )
 
 # 方式2: 搜索 + 表格勾选
-st.subheader("🔍 方式二：搜索并勾选")
+st.subheader("🔍 搜索并勾选基金")
 search = st.text_input("搜索基金名称或代码", placeholder="例如: 沪深300、000001...")
 
 if search:
@@ -470,7 +475,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
 
     # ── 结果展示 ──────────────────────────────────────
     st.divider()
-    st.subheader("📊 风险指标对比总览")
+    st.subheader("📊 风险指标总览")
 
     # 条件着色
     def highlight_risk(val, col_name):
@@ -496,7 +501,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
 
     # ── 图表区域 ──────────────────────────────────────
     st.divider()
-    st.subheader("📈 可视化对比")
+    st.subheader("📈 风险收益可视化")
 
     col1, col2 = st.columns(2)
 
@@ -552,7 +557,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
         st.plotly_chart(fig, use_container_width=True)
 
     # ── 累计收益走势 ──────────────────────────────────
-    st.subheader("📈 累计收益走势 (归一化)")
+    st.subheader("📈 累计收益走势对比")
     fig_cum = go.Figure()
     for name, nav in funds_nav.items():
         cum_ret = (nav / nav.dropna().iloc[0] - 1) * 100  # 百分比
@@ -601,7 +606,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
     st.plotly_chart(fig, use_container_width=True)
 
     # ── 风险指标雷达图 ──────────────────────────────────
-    st.subheader("🕸️ 风险-收益雷达图")
+    st.subheader("🕸️ 综合表现雷达图")
     radar_metrics = ["年化收益(%)", "卡玛比率", "夏普比率", "索提诺比率", "日胜率(%)"]
     # 反转指标：值越小越好 → 取反使其在雷达图中方向一致
     radar_inverse = ["最大回撤(%)", "年化波动率(%)"]
@@ -722,20 +727,59 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
 
         st.dataframe(styled_sim, use_container_width=True)
 
-        # 汇总
+        # 汇总卡片
         total_inv = sim_df["投入金额(元)"].sum()
         total_val = sim_df["最终市值(元)"].sum()
         total_profit = total_val - total_inv
-        cols = st.columns(4)
-        cols[0].metric("总投入", f"¥{total_inv:,.0f}")
-        cols[1].metric("总市值", f"¥{total_val:,.0f}")
-        cols[2].metric("总盈亏", f"¥{total_profit:+,.0f}",
-                       delta=f"{total_profit/total_inv*100:+.1f}%" if total_inv > 0 else None)
-        cols[3].metric("投入方式",
-                       f"{invest_mode}" + (f" · {invest_freq}{invest_period}元" if invest_mode == "定投" else f" · 各{total_amount/len(funds_nav):,.0f}元"))
+        profit_pct = total_profit / total_inv * 100 if total_inv > 0 else 0
+        profit_class = "profit" if total_profit >= 0 else "loss"
+        
+        mode_desc = (
+            f"定投 · {invest_freq} {invest_period} 元"
+            if invest_mode == "定投"
+            else f"一次性 · 各 {total_amount / len(funds_nav):,.0f} 元"
+        )
+        
+        st.markdown(f"""
+        <div class="sim-card-row">
+            <div class="sim-card info">
+                <div class="label">总投入金额</div>
+                <div class="value">¥{total_inv:,.0f}</div>
+                <div class="sub">{mode_desc}</div>
+            </div>
+            <div class="sim-card info">
+                <div class="label">当前总市值</div>
+                <div class="value">¥{total_val:,.0f}</div>
+                <div class="sub">{len(sim_results)} 只基金</div>
+            </div>
+            <div class="sim-card {profit_class}">
+                <div class="label">总盈亏</div>
+                <div class="value">¥{total_profit:+,.0f}</div>
+                <div class="sub">{profit_pct:+.1f}%</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 每只基金的卡片
+        st.caption("—— 各基金明细 ——")
+        cols_per_row = min(4, len(sim_results))
+        sim_cols = st.columns(cols_per_row)
+        for i, (_, row) in enumerate(sim_df.iterrows()):
+            col_idx = i % cols_per_row
+            p = row["盈亏(元)"]
+            pc = row["收益率(%)"]
+            p_class = "profit" if p >= 0 else "loss"
+            with sim_cols[col_idx]:
+                st.markdown(f"""
+                <div class="sim-card {p_class}" style="min-width:auto; margin-bottom:10px;">
+                    <div class="label">{row.name}</div>
+                    <div class="value" style="font-size:20px;">¥{p:+,.0f}</div>
+                    <div class="sub">{pc:+.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
 
         # 累计价值曲线
-        st.subheader("📈 模拟账户价值走势")
+        st.subheader("📈 账户价值走势")
         fig_val = go.Figure()
         for name, vals in sim_nav_data.items():
             fig_val.add_trace(go.Scatter(
@@ -753,7 +797,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
 
     # ── 每日净值明细 ──────────────────────────────────
     st.divider()
-    st.subheader("📋 每日净值、收益与市值")
+    st.subheader("📋 每日净值与收益明细")
 
     # 合并所有基金的日数据（按日期对齐）
     daily_table = None

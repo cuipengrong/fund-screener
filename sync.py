@@ -8,6 +8,12 @@ import os
 import sys
 import time
 
+# 修复 Windows GBK 编码
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 HOST = "124.223.183.165"
 USER = "ubuntu"
 PASS = "Cuipeng@0316"
@@ -16,7 +22,7 @@ LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def sync():
-    print(f"🔗 Connecting to {HOST}...")
+    print(f"Connecting to {HOST}...")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(HOST, username=USER, password=PASS, timeout=10)
@@ -45,14 +51,14 @@ def sync():
             elif os.path.isdir(lp):
                 upload_dir(lp, rp)
 
-    print("📦 Uploading files...")
+    print("Uploading files...")
     upload_dir(LOCAL_DIR, REMOTE_DIR)
     sftp.close()
 
-    print(f"✅ {uploaded} files uploaded")
+    print(f"OK {uploaded} files uploaded")
 
     # Restart service
-    print("🔄 Restarting service...")
+    print("Restarting service...")
     stdin, stdout, stderr = ssh.exec_command(
         "sudo systemctl restart fund-screener && sleep 3 && "
         "curl -s -o /dev/null -w '%{http_code}' http://localhost:8501",
@@ -62,10 +68,10 @@ def sync():
     err = stderr.read().decode().strip()
 
     if status == "200":
-        print(f"✅ Server OK (HTTP {status})")
-        print(f"🌐 http://{HOST}:8501")
+        print(f"OK Server (HTTP {status})")
+        print(f"  http://{HOST}:8501")
     else:
-        print(f"⚠️  Server returned HTTP {status}")
+        print(f"WARN Server returned HTTP {status}")
         if err:
             print(f"ERR: {err[:200]}")
 
