@@ -421,7 +421,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
 
     # 并发获取所有基金的净值
     def fetch_one(code, name):
-        nav_df, _ = cached_fund_nav(str(code), start_str, end_str, force=force_refresh)
+        nav_df, _ = cached_fund_nav(str(code), start_str, end_str, force=False)
         if nav_df.empty or "nav" not in nav_df.columns or len(nav_df) < 60:
             return name, None
         return name, nav_df
