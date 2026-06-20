@@ -320,6 +320,13 @@ code_name_map = dict(zip(fund_df["code"].astype(str), fund_df["name"]))
 # 限制显示列 + 收藏标记
 show_cols = [c for c in ["code", "name", "type", "nav", "daily_return", "ret_1y", "ret_3y", "aum"] if c in fund_df_filtered.columns]
 
+# 中文列名映射
+col_labels = {
+    "code": "基金代码", "name": "基金名称", "type": "类型",
+    "nav": "单位净值", "daily_return": "日涨幅%", "ret_1y": "近1年%",
+    "ret_3y": "近3年%", "aum": "规模",
+}
+
 # 添加收藏标记列
 fund_df_filtered = fund_df_filtered.reset_index(drop=True)
 display_df = fund_df_filtered[show_cols].copy()
@@ -329,7 +336,7 @@ display_df.insert(0, "收藏", [
 ])
 
 event = st.dataframe(
-    display_df,
+    display_df.rename(columns=col_labels),
     use_container_width=True,
     hide_index=True,
     height=250,
