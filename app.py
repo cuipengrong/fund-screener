@@ -26,8 +26,56 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.title("📊 基金风险指标筛选器")
-st.caption("基于 AkShare 数据 · 聚焦最大回撤、波动率、夏普比率等风险维度")
+# ── 自定义样式 ──────────────────────────────────────────
+st.markdown("""
+<style>
+.header-container {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: 16px;
+    padding: 28px 36px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+}
+.header-icon {
+    font-size: 48px;
+    line-height: 1;
+}
+.header-text h1 {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    letter-spacing: 2px;
+}
+.header-text p {
+    color: #a0aec0;
+    font-size: 14px;
+    margin: 0;
+}
+.header-badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    color: #e2e8f0;
+    margin-left: auto;
+    white-space: nowrap;
+}
+</style>
+
+<div class="header-container">
+    <div class="header-icon">📊</div>
+    <div class="header-text">
+        <h1>基金风险指标筛选器</h1>
+        <p>AkShare 数据驱动 · 最大回撤 · 夏普比率 · 卡玛比率 · 金额模拟</p>
+    </div>
+    <div class="header-badge">v2.0</div>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ── 缓存 ───────────────────────────────────────────────
