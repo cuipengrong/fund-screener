@@ -79,14 +79,17 @@ st.markdown("""
 
 
 # ── 缓存 ───────────────────────────────────────────────
-@st.cache_data(ttl=43200, show_spinner=False)
-def cached_fund_list(fund_type: str):
-    return fetch_fund_list(fund_type)
+from data_fetcher import fetch_fund_list_cached, fetch_fund_nav_cached
 
 
-@st.cache_data(ttl=43200, show_spinner=False)
-def cached_fund_nav(fund_code: str, start: str, end: str):
-    return fetch_fund_nav(fund_code, start, end)
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_fund_list(fund_type: str, force: bool = False):
+    return fetch_fund_list_cached(fund_type, force_refresh=force)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_fund_nav(fund_code: str, start: str, end: str, force: bool = False):
+    return fetch_fund_nav_cached(fund_code, start, end, force_refresh=force)
 
 
 # ── 侧边栏: 筛选控制 ────────────────────────────────────
@@ -192,23 +195,46 @@ with st.sidebar:
     )
 
 # ── 主区域 ──────────────────────────────────────────────
-# Step 1: 加载基金列表（延迟加载，避免每次打开页面都请求）
+# Step 1: 加载基金列表（延迟加载，优先 SQLite）
 if "fund_df" not in st.session_state:
     st.session_state.fund_df = None
 
+# 侧边栏底部: 缓存状态 + 强制刷新
+with st.sidebar:
+    st.divider()
+    st.subheader("💾 数据缓存")
+    force_refresh = st.checkbox("强制刷新（忽略缓存）", value=False,
+                                help="勾选后从东方财富重新拉取最新数据")
+    
+    from db import get_cache_stats
+    stats = get_cache_stats()
+    if stats["已缓存基金数"] > 0:
+        st.caption(
+            f"📦 {stats['已缓存基金数']} 只基金 · "
+            f"{stats['净值记录数']} 条净值 · "
+            f"{stats['数据库大小']}"
+        )
+
 if st.session_state.fund_df is None:
     if st.button("📥 加载基金列表", type="primary", use_container_width=True,
-                 help=f"从东方财富获取{fund_type}基金数据，首次约需3-10秒"):
+                 help=f"从缓存/SQLite获取{fund_type}基金数据"):
         with st.spinner("正在加载基金列表..."):
-            st.session_state.fund_df = cached_fund_list(fund_type)
+            fund_list_df, from_cache = cached_fund_list(fund_type, force=force_refresh)
+            st.session_state.fund_df = fund_list_df
+            if from_cache:
+                st.session_state.from_cache = True
         st.rerun()
-    # 还没有数据时显示提示
     fund_df = pd.DataFrame()
 else:
     fund_df = st.session_state.fund_df
-    # 如果切换了类型，提供刷新按钮
+    from_cache = st.session_state.get("from_cache", False)
+    if from_cache:
+        st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (来自本地缓存)")
+    else:
+        st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (实时数据)")
     if st.button("🔄 刷新基金列表 / 切换类型", use_container_width=True):
         st.session_state.fund_df = None
+        st.session_state.from_cache = False
         st.rerun()
 
 # 筛选搜索
@@ -312,7 +338,7 @@ if st.button("🚀 开始分析", type="primary", use_container_width=True):
 
     # 并发获取所有基金的净值
     def fetch_one(code, name):
-        nav_df = cached_fund_nav(str(code), start_str, end_str)
+        nav_df, _ = cached_fund_nav(str(code), start_str, end_str, force=force_refresh)
         if nav_df.empty or "nav" not in nav_df.columns or len(nav_df) < 60:
             return name, None
         return name, nav_df

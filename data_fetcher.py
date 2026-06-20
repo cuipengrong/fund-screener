@@ -133,3 +133,59 @@ def fetch_single_fund_info(fund_code: str) -> dict:
     except Exception:
         pass
     return {}
+
+
+# ── SQLite 缓存版 ──────────────────────────────────────
+
+import db as cache_db
+
+
+def fetch_fund_list_cached(fund_type: str = "全部", force_refresh: bool = False) -> tuple[pd.DataFrame, bool]:
+    """
+    获取基金列表（优先 SQLite 缓存，过期自动刷新）。
+    返回 (DataFrame, 是否来自缓存)。
+    """
+    if not force_refresh and cache_db.is_fund_list_fresh(fund_type):
+        df = cache_db.get_cached_fund_list(fund_type)
+        if df is not None and not df.empty:
+            return df, True
+
+    # 缓存过期或强制刷新
+    df = fetch_fund_list(fund_type)
+    if not df.empty:
+        cache_db.save_fund_list(fund_type, df)
+    return df, False
+
+
+def fetch_fund_nav_cached(fund_code: str, start_date: str = "20200101",
+                          end_date: str = "20251231", force_refresh: bool = False) -> tuple[pd.DataFrame, bool]:
+    """
+    获取基金净值（优先 SQLite 缓存，过期自动从 AkShare 刷新）。
+    返回 (DataFrame, 是否来自缓存)。
+    判断逻辑: 如果请求区间结束日期距今>3天，直接用缓存；否则检查是否已有最新数据。
+    """
+    code = str(fund_code)
+
+    if not force_refresh:
+        cached = cache_db.get_cached_nav(code, start_date, end_date)
+        if cached is not None and len(cached) >= 10:
+            # 检查是否需要刷新: 仅当请求区间覆盖最近3天才检查新鲜度
+            try:
+                end_dt = pd.to_datetime(end_date, format="%Y%m%d")
+                if end_dt > pd.Timestamp.now() - pd.Timedelta(days=3):
+                    # 请求包含近期数据，检查 SQLite 是否有最新
+                    if not cache_db.is_nav_fresh(code):
+                        pass  # 需要刷新，走下面的 AkShare 路径
+                    else:
+                        return cached, True
+                else:
+                    # 请求的是历史数据，有缓存就够了
+                    return cached, True
+            except Exception:
+                pass
+
+    # 从 AkShare 获取并写入缓存
+    df = fetch_fund_nav(code, start_date, end_date)
+    if not df.empty and "nav" in df.columns:
+        cache_db.save_nav(code, df)
+    return df, False
