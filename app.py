@@ -326,10 +326,12 @@ code_name_map = dict(zip(fund_df["code"].astype(str), fund_df["name"]))
 show_cols = [c for c in ["code", "name", "type", "nav", "daily_return", "ret_1y", "ret_3y", "aum"] if c in fund_df_filtered.columns]
 
 # 添加收藏标记列
+fund_df_filtered = fund_df_filtered.reset_index(drop=True)
 display_df = fund_df_filtered[show_cols].copy()
-display_df.insert(0, "收藏", display_df.index.map(
-    lambda i: "⭐" if str(fund_df_filtered.iloc[i]["code"]) in fav_codes_set else ""
-))
+display_df.insert(0, "收藏", [
+    "⭐" if str(fund_df_filtered.loc[i, "code"]) in fav_codes_set else ""
+    for i in range(len(fund_df_filtered))
+])
 
 event = st.dataframe(
     display_df,
