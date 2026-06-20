@@ -250,8 +250,15 @@ with st.sidebar:
             st.session_state.quick_codes = all_fav_codes
             st.rerun()
 
-# 自动加载（过期自动刷新）
-if st.session_state.fund_df is None or st.button("🔄 刷新数据", key="refresh_top"):
+# 自动加载（过期自动刷新，切换类型自动重载）
+if "last_fund_type" not in st.session_state:
+    st.session_state.last_fund_type = None
+
+type_changed = st.session_state.last_fund_type != fund_type
+if st.session_state.fund_df is None or type_changed or st.button("🔄 刷新数据", key="refresh_top"):
+    if type_changed:
+        st.session_state.fund_df = None  # 强制重新加载
+        st.session_state.last_fund_type = fund_type
     with st.spinner("正在加载基金列表（过期自动拉取最新）..."):
         fund_list_df, from_cache = cached_fund_list(fund_type, force=False)
         st.session_state.fund_df = fund_list_df
