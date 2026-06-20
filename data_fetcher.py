@@ -144,8 +144,13 @@ def fetch_fund_list_cached(fund_type: str = "全部", force_refresh: bool = Fals
     """
     获取基金列表（优先 SQLite 缓存，过期自动刷新）。
     返回 (DataFrame, 是否来自缓存)。
+    自动刷新规则: 缓存非今日数据则自动拉取最新。
     """
-    if not force_refresh and cache_db.is_fund_list_fresh(fund_type):
+    # 自动检测是否需要刷新（非今日数据）
+    auto_refresh = not cache_db.is_fund_list_fresh(fund_type)
+    need_fetch = force_refresh or auto_refresh
+    
+    if not need_fetch:
         df = cache_db.get_cached_fund_list(fund_type)
         if df is not None and not df.empty:
             return df, True

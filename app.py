@@ -200,17 +200,14 @@ with st.sidebar:
     )
 
 # ── 主区域 ──────────────────────────────────────────────
-# Step 1: 加载基金列表（延迟加载，优先 SQLite）
+# Step 1: 自动加载基金列表（SQLite 缓存优先，过期自动刷新）
 if "fund_df" not in st.session_state:
     st.session_state.fund_df = None
 
-# 侧边栏底部: 缓存状态 + 强制刷新
+# 侧边栏底部: 缓存状态 + 预热
 with st.sidebar:
     st.divider()
     st.subheader("💾 数据缓存")
-    force_refresh = st.checkbox("强制刷新（忽略缓存）", value=False,
-                                help="勾选后从东方财富重新拉取最新数据")
-    
     from db import get_cache_stats
     stats = get_cache_stats()
     if stats["已缓存基金数"] > 0:
@@ -248,57 +245,46 @@ with st.sidebar:
                     from db import remove_favorite
                     remove_favorite(f['code'])
                     st.rerun()
-        # 一键填入快速输入框
         all_fav_codes = " ".join([f["code"] for f in favs])
         if st.button("📋 一键填入代码框对比", use_container_width=True, key="fill_favs"):
             st.session_state.quick_codes = all_fav_codes
             st.rerun()
 
-if st.session_state.fund_df is None:
-    if st.button("📥 加载基金列表", type="primary", use_container_width=True,
-                 help=f"从缓存/SQLite获取{fund_type}基金数据"):
-        with st.spinner("正在加载基金列表..."):
-            fund_list_df, from_cache = cached_fund_list(fund_type, force=force_refresh)
-            st.session_state.fund_df = fund_list_df
-            if from_cache:
-                st.session_state.from_cache = True
+# 自动加载（过期自动刷新）
+if st.session_state.fund_df is None or st.button("🔄 刷新数据", key="refresh_top"):
+    with st.spinner("正在加载基金列表（过期自动拉取最新）..."):
+        fund_list_df, from_cache = cached_fund_list(fund_type, force=False)
+        st.session_state.fund_df = fund_list_df
+        st.session_state.from_cache = from_cache
+    if st.session_state.fund_df is not None:
         st.rerun()
-    fund_df = pd.DataFrame()
-else:
-    fund_df = st.session_state.fund_df
-    from_cache = st.session_state.get("from_cache", False)
-    
-    # ── 收藏功能区 ──────────────────────────────────────
-    from db import get_favorite_codes, add_favorite, remove_favorite, get_favorites
-    
-    fav_codes_set = get_favorite_codes()
-    
-    col_status, col_btn1, col_btn2, col_btn3 = st.columns([3, 1.2, 1.2, 1.2])
-    with col_status:
-        if from_cache:
-            st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (来自本地缓存)")
-        else:
-            st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (实时数据)")
-        n_fav = len(fav_codes_set)
-        if n_fav > 0:
-            st.caption(f"⭐ 已收藏 {n_fav} 只基金")
-    with col_btn1:
-        show_fav_only = st.toggle("📌 仅看收藏", value=False, key="fav_toggle")
-    with col_btn2:
-        if st.button("🔄 刷新列表", use_container_width=True):
-            st.session_state.fund_df = None
-            st.session_state.from_cache = False
-            st.rerun()
-    with col_btn3:
-        # 批量收藏/取消 表格中选中的基金
-        pass  # 按钮在表格下方
-    
-    # 收藏筛选
-    if show_fav_only and fav_codes_set:
-        fund_df = fund_df[fund_df["code"].astype(str).isin(fav_codes_set)]
-        if fund_df.empty:
-            st.warning("📌 当前类型下暂无收藏的基金，请切换类型或添加收藏")
-            st.stop()
+
+fund_df = st.session_state.fund_df
+from_cache = st.session_state.get("from_cache", False)
+
+# ── 收藏功能区 ──────────────────────────────────────
+from db import get_favorite_codes, add_favorite, remove_favorite, get_favorites
+
+fav_codes_set = get_favorite_codes()
+
+col_status, col_btn1 = st.columns([5, 1])
+with col_status:
+    if from_cache:
+        st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (本地缓存)")
+    else:
+        st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (实时数据)")
+    n_fav = len(fav_codes_set)
+    if n_fav > 0:
+        st.caption(f"⭐ 已收藏 {n_fav} 只基金")
+with col_btn1:
+    show_fav_only = st.toggle("📌 仅看收藏", value=False, key="fav_toggle")
+
+# 收藏筛选
+if show_fav_only and fav_codes_set:
+    fund_df = fund_df[fund_df["code"].astype(str).isin(fav_codes_set)]
+    if fund_df.empty:
+        st.warning("📌 当前类型下暂无收藏的基金，请切换类型或添加收藏")
+        st.stop()
 
 # 未加载时停止后续渲染
 if fund_df.empty:
