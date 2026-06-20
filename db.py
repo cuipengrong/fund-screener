@@ -49,9 +49,59 @@ def init_db():
             )
         """)
         db.execute("""
+            CREATE TABLE IF NOT EXISTS favorites (
+                code TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                fund_type TEXT,
+                added_at TEXT NOT NULL
+            )
+        """)
+        db.execute("""
             CREATE INDEX IF NOT EXISTS idx_nav_code_date ON fund_nav(code, date)
         """)
         db.commit()
+
+
+# ── 收藏管理 ───────────────────────────────────────────
+
+def get_favorites() -> list[dict]:
+    """获取所有收藏的基金"""
+    with _conn() as db:
+        rows = db.execute(
+            "SELECT code, name, fund_type, added_at FROM favorites ORDER BY added_at DESC"
+        ).fetchall()
+    return [{"code": r[0], "name": r[1], "fund_type": r[2], "added_at": r[3]} for r in rows]
+
+
+def get_favorite_codes() -> set[str]:
+    """获取收藏的基金代码集合"""
+    with _conn() as db:
+        rows = db.execute("SELECT code FROM favorites").fetchall()
+    return {r[0] for r in rows}
+
+
+def add_favorite(code: str, name: str, fund_type: str = ""):
+    """添加收藏"""
+    with _conn() as db:
+        db.execute(
+            "INSERT OR REPLACE INTO favorites (code, name, fund_type, added_at) VALUES (?,?,?,?)",
+            (str(code), str(name)[:100], str(fund_type), datetime.now().isoformat()),
+        )
+        db.commit()
+
+
+def remove_favorite(code: str):
+    """取消收藏"""
+    with _conn() as db:
+        db.execute("DELETE FROM favorites WHERE code = ?", (str(code),))
+        db.commit()
+
+
+def is_favorite(code: str) -> bool:
+    """检查是否已收藏"""
+    with _conn() as db:
+        row = db.execute("SELECT 1 FROM favorites WHERE code = ?", (str(code),)).fetchone()
+    return row is not None
 
 
 # ── 净值缓存 ───────────────────────────────────────────

@@ -228,6 +228,27 @@ with st.sidebar:
             st.caption(result.stdout[-500:] if result.stdout else "预热完成")
         st.rerun()
 
+    # ── 我的收藏快捷入口 ────────────────────────────────
+    st.divider()
+    st.subheader("⭐ 我的收藏")
+    from db import get_favorites
+    favs = get_favorites()
+    if favs:
+        for f in favs:
+            col_f, col_d = st.columns([8, 2])
+            with col_f:
+                st.caption(f"⭐ {f['name']} `{f['code']}`")
+            with col_d:
+                if st.button("❌", key=f"del_{f['code']}", help="取消收藏"):
+                    from db import remove_favorite
+                    remove_favorite(f['code'])
+                    st.rerun()
+        # 一键填入快速输入框
+        all_fav_codes = " ".join([f["code"] for f in favs])
+        if st.button("📋 一键填入代码框对比", use_container_width=True, key="fill_favs"):
+            st.session_state.quick_codes = all_fav_codes
+            st.rerun()
+
 if st.session_state.fund_df is None:
     if st.button("📥 加载基金列表", type="primary", use_container_width=True,
                  help=f"从缓存/SQLite获取{fund_type}基金数据"):
@@ -241,14 +262,38 @@ if st.session_state.fund_df is None:
 else:
     fund_df = st.session_state.fund_df
     from_cache = st.session_state.get("from_cache", False)
-    if from_cache:
-        st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (来自本地缓存)")
-    else:
-        st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (实时数据)")
-    if st.button("🔄 刷新基金列表 / 切换类型", use_container_width=True):
-        st.session_state.fund_df = None
-        st.session_state.from_cache = False
-        st.rerun()
+    
+    # ── 收藏功能区 ──────────────────────────────────────
+    from db import get_favorite_codes, add_favorite, remove_favorite, get_favorites
+    
+    fav_codes_set = get_favorite_codes()
+    
+    col_status, col_btn1, col_btn2, col_btn3 = st.columns([3, 1.2, 1.2, 1.2])
+    with col_status:
+        if from_cache:
+            st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (来自本地缓存)")
+        else:
+            st.success(f"✅ 已加载 **{len(fund_df)}** 只基金 (实时数据)")
+        n_fav = len(fav_codes_set)
+        if n_fav > 0:
+            st.caption(f"⭐ 已收藏 {n_fav} 只基金")
+    with col_btn1:
+        show_fav_only = st.toggle("📌 仅看收藏", value=False, key="fav_toggle")
+    with col_btn2:
+        if st.button("🔄 刷新列表", use_container_width=True):
+            st.session_state.fund_df = None
+            st.session_state.from_cache = False
+            st.rerun()
+    with col_btn3:
+        # 批量收藏/取消 表格中选中的基金
+        pass  # 按钮在表格下方
+    
+    # 收藏筛选
+    if show_fav_only and fav_codes_set:
+        fund_df = fund_df[fund_df["code"].astype(str).isin(fav_codes_set)]
+        if fund_df.empty:
+            st.warning("📌 当前类型下暂无收藏的基金，请切换类型或添加收藏")
+            st.stop()
 
 # 筛选搜索
 # 方式1: 快速输入代码（逗号/空格/换行分隔）
@@ -258,6 +303,7 @@ quick_codes = st.text_area(
     placeholder="例如: 001480, 011369, 010013, 001956, 110020",
     height=68,
     key="quick_codes",
+    value=st.session_state.get("quick_codes", ""),
 )
 
 # 方式2: 搜索 + 表格勾选
@@ -273,22 +319,50 @@ if search:
 else:
     fund_df_filtered = fund_df.copy()
 
-# 限制显示列
+# 提前构建代码→名称映射（收藏按钮需要）
+code_name_map = dict(zip(fund_df["code"].astype(str), fund_df["name"]))
+
+# 限制显示列 + 收藏标记
 show_cols = [c for c in ["code", "name", "type", "nav", "daily_return", "ret_1y", "ret_3y", "aum"] if c in fund_df_filtered.columns]
 
+# 添加收藏标记列
+display_df = fund_df_filtered[show_cols].copy()
+display_df.insert(0, "收藏", display_df.index.map(
+    lambda i: "⭐" if str(fund_df_filtered.iloc[i]["code"]) in fav_codes_set else ""
+))
+
 event = st.dataframe(
-    fund_df_filtered[show_cols],
+    display_df,
     use_container_width=True,
     hide_index=True,
     height=250,
     on_select="rerun",
     selection_mode="multi-row",
+    column_config={"收藏": st.column_config.TextColumn(width="small")},
 )
 
-# 合并两种选择方式
+# 收藏/取消收藏按钮（操作表格中勾选的行）
 table_selected_codes = []
 if event.selection.rows:
     table_selected_codes = fund_df_filtered.iloc[event.selection.rows]["code"].tolist()
+    
+    sel_fav = [c for c in table_selected_codes if str(c) in fav_codes_set]
+    sel_not = [c for c in table_selected_codes if str(c) not in fav_codes_set]
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if sel_not:
+            if st.button(f"⭐ 收藏选中 ({len(sel_not)}只)", use_container_width=True):
+                for c in sel_not:
+                    name = code_name_map.get(str(c).zfill(6), str(c))
+                    add_favorite(str(c).zfill(6), name, fund_type)
+                st.rerun()
+    with c2:
+        if sel_fav:
+            if st.button(f"❌ 取消收藏 ({len(sel_fav)}只)", use_container_width=True):
+                for c in sel_fav:
+                    remove_favorite(str(c).zfill(6))
+                st.rerun()
 
 # 解析快速输入
 quick_code_list = []
@@ -309,7 +383,6 @@ if len(all_selected) > 10:
     all_selected = all_selected[:10]
 
 # 从原始 fund_df 中查找代码对应的基金名
-code_name_map = dict(zip(fund_df["code"].astype(str), fund_df["name"]))
 selected_codes = []
 selected_names = []
 not_found = []
